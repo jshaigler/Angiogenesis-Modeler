@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Angiogenesis Simulation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.24.2/plotly.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --primary: #BB86FC;
+            --secondary: #03DAC6;
+            --accent: #CF6679;
+            --text: #E1E1E1;
+            --slider-bg: #333333;
+            --slider-thumb: #BB86FC;
+            --artery-color: #CF6679;
+            --vein-color: #03DAC6;
+            --capillary-color: #4CAF50;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            line-height: 1.6;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: var(--card-bg);
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            text-align: center;
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 400;
+            color: var(--primary);
+        }
+        
+        main {
+            display: flex;
+            flex-direction: row;
+            flex: 1;
+            padding: 1rem;
+            gap: 1rem;
+        }
+        
+        #plot-container {
+            flex: 1;
+            min-height: 600px;
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        #controls {
+            width: 300px;
+            background-color: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+        }
+        
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+        
+        .slider-value {
+            color: var(--secondary);
+            font-weight: 500;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 5px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--slider-bg);
+            border-radius: 5px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--slider-thumb);
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: var(--primary);
+            transform: scale(1.1);
+        }
+        
+        button {
+            background-color: var(--primary);
+            color: #000;
+            border: none;
+            padding: 0.8rem;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 1rem;
+        }
+        
+        button:hover {
+            background-color: #9d68db;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        .toggle-container {
+            display: flex;
+            gap: 0.8rem;
+            margin-top: 1rem;
+        }
+        
+        .toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--slider-bg);
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--primary);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(18px);
+        }
+        
+        .color-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }
+        
+        .artery-color {
+            background-color: var(--artery-color);
+        }
+        
+        .vein-color {
+            background-color: var(--vein-color);
+        }
+        
+        .capillary-color {
+            background-color: var(--capillary-color);
+        }
+        
+        .type-a-color {
+            background-color: #9C27B0; /* purple */
+        }
+        
+        .type-b-color {
+            background-color: #FF9800; /* orange */
+        }
+        
+        .type-c-color {
+            background-color: #009688; /* teal */
+        }
+        
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.8rem;
+            margin-top: 1rem;
+            padding: 0.8rem;
+            background-color: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            font-size: 0.8rem;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0,0,0,0.7);
+            padding: 1rem 2rem;
+            border-radius: 4px;
+            z-index: 100;
+        }
+        
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>3D Angiogenesis Simulation</h1>
+    </header>
+    
+    <main>
+        <div id="plot-container">
+            <div id="plot"></div>
+            <div id="loading" class="loading hidden">
+                <span class="spinner"></span> Calculating...
+            </div>
+        </div>
+        
+        <div id="controls">
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>Max Depth</span>
+                    <span class="slider-value" id="max-depth-value">5</span>
+                </div>
+                <input type="range" id="max-depth" min="2" max="8" step="1" value="5">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>Angle Range (°)</span>
+                    <span class="slider-value" id="angle-range-value">30</span>
+                </div>
+                <input type="range" id="angle-range" min="10" max="60" step="5" value="30">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>Branch Length</span>
+                    <span class="slider-value" id="branch-length-value">0.10</span>
+                </div>
+                <input type="range" id="branch-length" min="0.05" max="0.20" step="0.01" value="0.10">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>Capillary Threshold</span>
+                    <span class="slider-value" id="capillary-threshold-value">0.15</span>
+                </div>
+                <input type="range" id="capillary-threshold" min="0.05" max="0.50" step="0.05" value="0.15">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>Number of Cells</span>
+                    <span class="slider-value" id="num-cells-value">200</span>
+                </div>
+                <input type="range" id="num-cells" min="50" max="500" step="50" value="200">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>Oxygen Scale</span>
+                    <span class="slider-value" id="oxygen-scale-value">0.05</span>
+                </div>
+                <input type="range" id="oxygen-scale" min="0.01" max="0.20" step="0.01" value="0.05">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>Number of Arteries</span>
+                    <span class="slider-value" id="num-arteries-value">3</span>
+                </div>
+                <input type="range" id="num-arteries" min="1" max="5" step="1" value="3">
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-label">
+                    <span>Number of Veins</span>
+                    <span class="slider-value" id="num-veins-value">3</span>
+                </div>
+                <input type="range" id="num-veins" min="1" max="5" step="1" value="3">
+            </div>
+            
+            <div class="toggle-container">
+                <div class="legend">
+                    <div class="legend-item">
+                        <span class="color-indicator artery-color"></span>
+                        <span>Arteries</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="color-indicator vein-color"></span>
+                        <span>Veins</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="color-indicator capillary-color"></span>
+                        <span>Capillaries</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="color-indicator type-a-color"></span>
+                        <span>Type A</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="color-indicator type-b-color"></span>
+                        <span>Type B</span>
+                    </div>
+                    <div class="legend-item">
+                        <span class="color-indicator type-c-color"></span>
+                        <span>Type C</span>
+                    </div>
+                </div>
+            </div>
+            
+            <button id="update-btn">Recalculate</button>
+        </div>
+    </main>
+    
+    <script>
+        // Current parameter values
+        const params = {
+            maxDepth: 5,
+            angleRange: 30,
+            initialBranchLength: 0.1,
+            capillaryThreshold: 0.15,
+            numCells: 200,
+            oxygenScale: 0.05,
+            numArteries: 3,
+            numVeins: 3
+        };
+
+        // Possible cell types and colors - Move these up here
+        const possibleCellTypes = ["Type A", "Type B", "Type C"];
+        const cellTypes = ["Type A", "Type B", "Type C"];
+        const cellColorMap = {
+            "Type A": "#9C27B0", // purple
+            "Type B": "#FF9800", // orange
+            "Type C": "#009688"  // teal
+        };
+
+        // DOM elements
+        const plotContainer = document.getElementById('plot');
+        const loadingIndicator = document.getElementById('loading');
+        const updateBtn = document.getElementById('update-btn');
+        
+        // Initialize all sliders
+        const sliders = [
+            { id: 'max-depth', valueId: 'max-depth-value', param: 'maxDepth', format: v => v },
+            { id: 'angle-range', valueId: 'angle-range-value', param: 'angleRange', format: v => v },
+            { id: 'branch-length', valueId: 'branch-length-value', param: 'initialBranchLength', format: v => v.toFixed(2) },
+            { id: 'capillary-threshold', valueId: 'capillary-threshold-value', param: 'capillaryThreshold', format: v => v.toFixed(2) },
+            { id: 'num-cells', valueId: 'num-cells-value', param: 'numCells', format: v => v },
+            { id: 'oxygen-scale', valueId: 'oxygen-scale-value', param: 'oxygenScale', format: v => v.toFixed(2) },
+            { id: 'num-arteries', valueId: 'num-arteries-value', param: 'numArteries', format: v => v },
+            { id: 'num-veins', valueId: 'num-veins-value', param: 'numVeins', format: v => v }
+        ];
+        
+        // Set up slider event listeners
+        sliders.forEach(slider => {
+            const sliderElement = document.getElementById(slider.id);
+            const valueElement = document.getElementById(slider.valueId);
+            
+            // Initialize value display
+            valueElement.textContent = slider.format(parseFloat(sliderElement.value));
+            
+            // Update value display on input
+            sliderElement.addEventListener('input', () => {
+                const value = parseFloat(sliderElement.value);
+                valueElement.textContent = slider.format(value);
+                params[slider.param] = value;
+            });
+        });
+        
+        // Function to generate a random direction in a cone
+        function randomDirectionInCone(v, angleRange) {
+            // Convert angle from degrees to radians
+            const angleRad = angleRange * Math.PI / 180;
+            
+            // Generate random direction within cone
+            const cosTheta = Math.cos(angleRad) + Math.random() * (1 - Math.cos(angleRad));
+            const theta = Math.acos(cosTheta);
+            const phi = Math.random() * 2 * Math.PI;
+            
+            // Convert to Cartesian coordinates
+            const localDir = [
+                Math.sin(theta) * Math.cos(phi),
+                Math.sin(theta) * Math.sin(phi),
+                Math.cos(theta)
+            ];
+            
+            // Define z-axis
+            const zAxis = [0, 0, 1];
+            
+            // Check if v is parallel to z-axis
+            if (vectorsAlmostEqual(v, zAxis)) {
+                return localDir;
+            }
+            if (vectorsAlmostEqual(v, scalarMult(zAxis, -1))) {
+                // Use x-axis as rotation axis
+                return rotateVector(localDir, [1, 0, 0], Math.PI);
+            }
+            
+            // Calculate rotation from z-axis to v
+            const rotationAxis = crossProduct(zAxis, v);
+            const rotationAxisNorm = normalize(rotationAxis);
+            const angle = Math.acos(dotProduct(zAxis, v));
+            
+            // Apply rotation to localDir
+            const newDir = rotateVector(localDir, rotationAxisNorm, angle);
+            return normalize(newDir);
+        }
+        
+        // Vector operations
+        function dotProduct(a, b) {
+            return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+        }
+        
+        function crossProduct(a, b) {
+            return [
+                a[1] * b[2] - a[2] * b[1],
+                a[2] * b[0] - a[0] * b[2],
+                a[0] * b[1] - a[1] * b[0]
+            ];
+        }
+        
+        function vectorNorm(v) {
+            return Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+        }
+        
+        function normalize(v) {
+            const norm = vectorNorm(v);
+            if (norm === 0) return v;
+            return [v[0] / norm, v[1] / norm, v[2] / norm];
+        }
+        
+        function scalarMult(v, s) {
+            return [v[0] * s, v[1] * s, v[2] * s];
+        }
+        
+        function vectorsAlmostEqual(a, b, tol = 1e-10) {
+            const diff = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+            return vectorNorm(diff) < tol;
+        }
+        
+        // Rodrigues' rotation formula
+        function rotateVector(v, axis, angle) {
+            const cosAngle = Math.cos(angle);
+            const sinAngle = Math.sin(angle);
+            
+            const term1 = scalarMult(v, cosAngle);
+            const term2 = scalarMult(crossProduct(axis, v), sinAngle);
+            const term3 = scalarMult(axis, dotProduct(axis, v) * (1 - cosAngle));
+            
+            return [
+                term1[0] + term2[0] + term3[0],
+                term1[1] + term2[1] + term3[1],
+                term1[2] + term2[2] + term3[2]
+            ];
+        }
+        
+        // Generate 3D tree recursively
+        function generateTree3D(x, y, z, direction, depth, maxDepth, branchLength, angleRange, thickness, treeType, segments, terminals) {
+            if (depth >= maxDepth) {
+                terminals.push([x, y, z]);
+                return;
+            }
+            
+            for (let i = 0; i < 2; i++) {
+                const newDir = randomDirectionInCone(direction, angleRange);
+                const xNew = x + branchLength * newDir[0];
+                const yNew = y + branchLength * newDir[1];
+                const zNew = z + branchLength * newDir[2];
+                
+                segments.push([x, y, z, xNew, yNew, zNew, treeType, thickness]);
+                generateTree3D(
+                    xNew, yNew, zNew, 
+                    newDir, 
+                    depth + 1, 
+                    maxDepth,
+                    branchLength * 0.9, 
+                    angleRange, 
+                    thickness * 0.8, 
+                    treeType, 
+                    segments, 
+                    terminals
+                );
+            }
+        }
+        
+        // Distance between point and segment in 3D
+        function pointToSegmentDistance3D(P, A, B) {
+            const AB = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
+            
+            // Check if segment is actually a point
+            if (vectorNorm(AB) < 1e-10) {
+                return vectorNorm([P[0] - A[0], P[1] - A[1], P[2] - A[2]]);
+            }
+            
+            const PA = [P[0] - A[0], P[1] - A[1], P[2] - A[2]];
+            const t = dotProduct(PA, AB) / dotProduct(AB, AB);
+            
+            if (t < 0) {
+                return vectorNorm(PA);
+            } else if (t > 1) {
+                return vectorNorm([P[0] - B[0], P[1] - B[1], P[2] - B[2]]);
+            }
+            
+            const projection = [
+                A[0] + t * AB[0],
+                A[1] + t * AB[1],
+                A[2] + t * AB[2]
+            ];
+            
+            return vectorNorm([P[0] - projection[0], P[1] - projection[1], P[2] - projection[2]]);
+        }
+        
+        // Find nearest point on a segment
+        function nearestPointOnSegment(P, A, B) {
+            const AB = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
+            
+            // Check if segment is actually a point
+            if (vectorNorm(AB) < 1e-10) {
+                return [...A];
+            }
+            
+            const PA = [P[0] - A[0], P[1] - A[1], P[2] - A[2]];
+            let t = dotProduct(PA, AB) / dotProduct(AB, AB);
+            t = Math.max(0, Math.min(1, t));
+            
+            return [
+                A[0] + t * AB[0],
+                A[1] + t * AB[1],
+                A[2] + t * AB[2]
+            ];
+        }
+        
+        // Generate curve points (Bézier curve)
+        function generateCurvePoints(P0, P1, nPoints = 20, curvatureFactor = 0.3) {
+            const mid = [
+                (P0[0] + P1[0]) / 2,
+                (P0[1] + P1[1]) / 2,
+                (P0[2] + P1[2]) / 2
+            ];
+            
+            const d = [P1[0] - P0[0], P1[1] - P0[1], P1[2] - P0[2]];
+            const length = vectorNorm(d);
+            
+            if (length === 0) {
+                return Array(nPoints).fill(P0);
+            }
+            
+            // Create a random perpendicular vector for the control point
+            const randomVec = [Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5];
+            const proj = scalarMult(d, dotProduct(randomVec, d) / (length * length));
+            const perp = [randomVec[0] - proj[0], randomVec[1] - proj[1], randomVec[2] - proj[2]];
+            
+            const perpNorm = vectorNorm(perp);
+            let normalizedPerp;
+            
+            if (perpNorm === 0) {
+                normalizedPerp = [0, 0, 0];
+            } else {
+                normalizedPerp = [perp[0] / perpNorm, perp[1] / perpNorm, perp[2] / perpNorm];
+            }
+            
+            const offset = scalarMult(normalizedPerp, curvatureFactor * length);
+            const control = [mid[0] + offset[0], mid[1] + offset[1], mid[2] + offset[2]];
+            
+            // Generate points along the Bézier curve
+            const curvePoints = [];
+            for (let i = 0; i < nPoints; i++) {
+                const t = i / (nPoints - 1);
+                const u = 1 - t;
+                
+                const x = u * u * P0[0] + 2 * u * t * control[0] + t * t * P1[0];
+                const y = u * u * P0[1] + 2 * u * t * control[1] + t * t * P1[1];
+                const z = u * u * P0[2] + 2 * u * t * control[2] + t * t * P1[2];
+                
+                curvePoints.push([x, y, z]);
+            }
+            
+            return curvePoints;
+        }
+        
+        // Generate clustered cells
+        function generateCells(numCells, possibleCellTypes) {
+            const cells = [];
+            const cellTypes = [];
+            const cellRequirements = [];
+            const numTypes = possibleCellTypes.length;
+            
+            // Distribute cells roughly equally among types
+            const baseNum = Math.floor(numCells / numTypes);
+            const remainder = numCells % numTypes;
+            
+            for (let i = 0; i < numTypes; i++) {
+                const cellType = possibleCellTypes[i];
+                const count = baseNum + (i < remainder ? 1 : 0);
+                
+                // Use 2 clusters if count is high enough; otherwise 1 cluster
+                const clusters = count > 10 ? 2 : 1;
+                const cellsPerCluster = Math.floor(count / clusters);
+                const extra = count % clusters;
+                
+                for (let c = 0; c < clusters; c++) {
+                    const clusterCount = cellsPerCluster + (c < extra ? 1 : 0);
+                    
+                    // Choose a cluster center within the unit cube (biased toward the center)
+                    const center = [
+                        Math.random() * 0.6 + 0.2,
+                        Math.random() * 0.6 + 0.2,
+                        Math.random() * 0.6 + 0.2
+                    ];
+                    
+                    const std = 0.05; // Standard deviation for the cluster spread
+                    
+                    for (let j = 0; j < clusterCount; j++) {
+                        const point = [
+                            center[0] + (Math.random() * 2 - 1) * std,
+                            center[1] + (Math.random() * 2 - 1) * std,
+                            center[2] + (Math.random() * 2 - 1) * std
+                        ];
+                        
+                        // Clip values to [0, 1]
+                        point[0] = Math.max(0, Math.min(1, point[0]));
+                        point[1] = Math.max(0, Math.min(1, point[1]));
+                        point[2] = Math.max(0, Math.min(1, point[2]));
+                        
+                        cells.push(point);
+                        cellTypes.push(cellType);
+                        cellRequirements.push(Math.random() * 0.3 + 0.6); // Random value between 0.6 and 0.9
+                    }
+                }
+            }
+            
+            return [cells, cellTypes, cellRequirements];
+        }
+        
+        // Check if a terminal is connected to a capillary
+        function isTerminalConnected(pt, segments, tol = 1e-3) {
+            for (const seg of segments) {
+                if (seg[6] === 'capillary') {
+                    const segStart = seg.slice(0, 3);
+                    const segEnd = seg.slice(3, 6);
+                    
+                    const distToStart = vectorNorm([
+                        pt[0] - segStart[0],
+                        pt[1] - segStart[1],
+                        pt[2] - segStart[2]
+                    ]);
+                    
+                    const distToEnd = vectorNorm([
+                        pt[0] - segEnd[0],
+                        pt[1] - segEnd[1],
+                        pt[2] - segEnd[2]
+                    ]);
+                    
+                    if (distToStart < tol || distToEnd < tol) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        // Compute oxygen levels
+        function computeOxygenLevels(cells, segments, oxygenScale) {
+            const oxygenLevels = [];
+            
+            for (const cell of cells) {
+                let minDist = Infinity;
+                
+                for (const seg of segments) {
+                    const A = seg.slice(0, 3);
+                    const B = seg.slice(3, 6);
+                    const d = pointToSegmentDistance3D(cell, A, B);
+                    
+                    if (d < minDist) {
+                        minDist = d;
+                    }
+                }
+                
+                const oxygen = Math.exp(-minDist / oxygenScale);
+                oxygenLevels.push(oxygen);
+            }
+            
+            return oxygenLevels;
+        }
+        
+        // Simulate vasculature in 3D
+        function simulateVasculature3D(params) {
+            // Destructure parameters
+            const {
+                maxDepth,
+                angleRange,
+                initialBranchLength,
+                capillaryThreshold,
+                numCells,
+                oxygenScale,
+                numArteries,
+                numVeins
+            } = params;
+            
+            // Set random seed (for reproducibility)
+            Math.seedrandom = function(seed) {
+                let m = 0x80000000; // 2**31
+                let a = 1103515245;
+                let c = 12345;
+                let z = seed || Math.floor(Math.random() * m);
+                return function() {
+                    z = (a * z + c) % m;
+                    return z / m;
+                };
+            };
+            
+            Math.random = Math.seedrandom(42);
+            
+            const segments = [];
+            const arterialTerminals = [];
+            const venousTerminals = [];
+            
+            // Grow arterial trees along the left boundary
+            // Grow arterial trees along the left boundary
+            for (let i = 0; i < numArteries; i++) {
+                const arterialStart = [
+                    0,
+                    Math.random() * 0.4 + 0.3,
+                    Math.random() * 0.4 + 0.3
+                ];
+                const arterialDirection = [1, 0, 0];
+                generateTree3D(
+                    arterialStart[0], arterialStart[1], arterialStart[2],
+                    arterialDirection, 0, maxDepth, initialBranchLength,
+                    angleRange, 3.0, 'artery', segments, arterialTerminals
+                );
+            }
+
+            // Grow venous trees along the right boundary
+            for (let i = 0; i < numVeins; i++) {
+                const venousStart = [
+                    1,
+                    Math.random() * 0.4 + 0.3,
+                    Math.random() * 0.4 + 0.3
+                ];
+                const venousDirection = [-1, 0, 0];
+                generateTree3D(
+                    venousStart[0], venousStart[1], venousStart[2],
+                    venousDirection, 0, maxDepth, initialBranchLength,
+                    angleRange, 3.0, 'vein', segments, venousTerminals
+                );
+            }
+
+            // Generate cells
+            const [cells, cellTypes, cellRequirements] = generateCells(numCells, possibleCellTypes);
+
+            // Create initial capillary connections
+            for (const A of arterialTerminals) {
+                for (const V of venousTerminals) {
+                    const dist = vectorNorm([
+                        A[0] - V[0],
+                        A[1] - V[1],
+                        A[2] - V[2]
+                    ]);
+                    if (dist < capillaryThreshold) {
+                        segments.push([...A, ...V, 'capillary', 0.5]);
+                    }
+                }
+            }
+
+            // Compute oxygen and add capillaries where needed
+            let oxygenLevels = computeOxygenLevels(cells, segments, oxygenScale);
+            const maxIterations = 10;
+            let iteration = 0;
+
+            while (oxygenLevels.some((o, i) => o < cellRequirements[i]) && iteration < maxIterations) {
+                for (let i = 0; i < cells.length; i++) {
+                    if (oxygenLevels[i] < cellRequirements[i]) {
+                        let minDist = Infinity;
+                        let nearestPoint = null;
+                        
+                        for (const seg of segments) {
+                            const A = seg.slice(0, 3);
+                            const B = seg.slice(3, 6);
+                            const pt = nearestPointOnSegment(cells[i], A, B);
+                            const d = vectorNorm([
+                                cells[i][0] - pt[0],
+                                cells[i][1] - pt[1],
+                                cells[i][2] - pt[2]
+                            ]);
+                            
+                            if (d < minDist) {
+                                minDist = d;
+                                nearestPoint = pt;
+                            }
+                        }
+
+                        if (nearestPoint) {
+                            segments.push([
+                                ...nearestPoint,
+                                ...cells[i],
+                                'capillary',
+                                0.5
+                            ]);
+                        }
+                    }
+                }
+                oxygenLevels = computeOxygenLevels(cells, segments, oxygenScale);
+                iteration++;
+            }
+
+            return { segments, cells, cellTypes };
+        }
+
+        // Create Plotly visualization
+        function createVisualization(result) {
+            const { segments, cells, cellTypes } = result;
+
+            // Separate segments by type
+            const arteries = segments.filter(s => s[6] === 'artery');
+            const veins = segments.filter(s => s[6] === 'vein');
+            const capillaries = segments.filter(s => s[6] === 'capillary');
+
+            // Create curve points for smooth visualization
+            function createVesselTraces(vessels, color, name, width) {
+                const x = [];
+                const y = [];
+                const z = [];
+
+                for (const vessel of vessels) {
+                    const curves = generateCurvePoints(
+                        vessel.slice(0, 3),
+                        vessel.slice(3, 6),
+                        20,
+                        0.3
+                    );
+
+                    for (const point of curves) {
+                        x.push(point[0]);
+                        y.push(point[1]);
+                        z.push(point[2]);
+                    }
+                    x.push(null);
+                    y.push(null);
+                    z.push(null);
+                }
+
+                return {
+                    type: 'scatter3d',
+                    mode: 'lines',
+                    x, y, z,
+                    line: {
+                        color: color,
+                        width: width
+                    },
+                    name: name
+                };
+            }
+
+            // Create cell traces by type
+            function createCellTraces() {
+                const traces = [];
+                const cellsByType = {};
+
+                cells.forEach((cell, i) => {
+                    const type = cellTypes[i];
+                    if (!cellsByType[type]) {
+                        cellsByType[type] = {
+                            x: [], y: [], z: []
+                        };
+                    }
+                    cellsByType[type].x.push(cell[0]);
+                    cellsByType[type].y.push(cell[1]);
+                    cellsByType[type].z.push(cell[2]);
+                });
+
+                for (const [type, coords] of Object.entries(cellsByType)) {
+                    traces.push({
+                        type: 'scatter3d',
+                        mode: 'markers',
+                        x: coords.x,
+                        y: coords.y,
+                        z: coords.z,
+                        marker: {
+                            size: 4,
+                            color: cellColorMap[type],
+                            opacity: 0.8
+                        },
+                        name: type
+                    });
+                }
+
+                return traces;
+            }
+
+            const data = [
+                createVesselTraces(arteries, '#CF6679', 'Arteries', 4),
+                createVesselTraces(veins, '#03DAC6', 'Veins', 4),
+                createVesselTraces(capillaries, '#4CAF50', 'Capillaries', 2),
+                ...createCellTraces()
+            ];
+
+            const layout = {
+                scene: {
+                    xaxis: { range: [-0.1, 1.1], gridcolor: '#444' },
+                    yaxis: { range: [-0.1, 1.1], gridcolor: '#444' },
+                    zaxis: { range: [-0.1, 1.1], gridcolor: '#444' },
+                    bgcolor: '#1e1e1e'
+                },
+                paper_bgcolor: '#121212',
+                plot_bgcolor: '#121212',
+                margin: { l: 0, r: 0, t: 0, b: 0 },
+                showlegend: true,
+                legend: {
+                    bgcolor: '#1e1e1e',
+                    font: { color: '#fff' }
+                }
+            };
+
+            Plotly.newPlot('plot', data, layout);
+        }
+
+        // Update visualization
+        async function updateVisualization() {
+            loadingIndicator.classList.remove('hidden');
+            
+            // Use setTimeout to allow loading indicator to show
+            setTimeout(async () => {
+                try {
+                    const result = simulateVasculature3D(params);
+                    createVisualization(result);
+                } catch (error) {
+                    console.error('Error updating visualization:', error);
+                } finally {
+                    loadingIndicator.classList.add('hidden');
+                }
+            }, 100);
+        }
+
+        // Add event listeners
+        updateBtn.addEventListener('click', updateVisualization);
+
+        // Initial visualization
+        updateVisualization();
+    </script>
+</body>
+</html>
